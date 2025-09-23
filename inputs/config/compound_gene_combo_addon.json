@@ -1,0 +1,37 @@
+{
+    "scenario": "compound-gene-addon",
+    "pipeline": "profiles_var_mad_int_featselect_harmony",
+    "keep_image_features": false,
+    "use_mad_negcon": true,
+    "sources": [
+        "source_1",
+        "source_2",
+        "source_3",
+        "source_4",
+        "source_5",
+        "source_6",
+        "source_7",
+        "source_8",
+        "source_9",
+        "source_10",
+        "source_11",
+        "source_13",
+        "source_2021_03_11_MolecularGlue_AmitChoudharyLab_Broad",
+        "source_2021_04_07_ProteinKinaseInhibitors_NathanaelGray",
+        "source_2021_07_23_PPARG_agonist_Target_ID",
+        "source_2021_UMiami_PRISM_combined",
+        "source_2022_11_28_GrekaAlimova_MOA",
+        "source_2022_11_28_Wagner_MOA",
+        "source_2024_05_02_Schade_BMP_CPStd"
+    ],
+    "plate_types": [
+        "COMPOUND",
+        "TARGET2",
+        "ORF",
+        "CRISPR"
+    ],
+    "search_additional_metadata": true,
+    "batch_key": "Metadata_Batch",
+    "sphering_method": "ZCA-cor",
+    "sphering_n_opts": 25
+}

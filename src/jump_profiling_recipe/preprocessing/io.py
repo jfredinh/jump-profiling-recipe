@@ -411,6 +411,10 @@ def load_data(
             meta[int(start) : int(end)] = df[meta_cols].values
             feats[int(start) : int(end)] = df[feat_cols].values
 
+    feat_cols = [col for col in feat_cols if "Image_" not in col]
+    feat_cols = [col for col in feat_cols if "Cells_Parent_CellsIncludingEdges" not in col]
+    print(f"Using {len(feat_cols)} features after filtering")
+    
     # Pre-allocate arrays
     meta = np.empty([total, len(meta_cols)], dtype="|S128")
     feats = np.empty([total, len(feat_cols)], dtype=np.float32)

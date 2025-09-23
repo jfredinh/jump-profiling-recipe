@@ -55,6 +55,20 @@ NEGCON_CODES = [
     "JCP2022_915130",
     "JCP2022_915129",
     "JCP2022_915128",
+    "DMSO:negcon:200.0:nan",
+    "UNSPECIFIED",
+    "nan:negcon:nan",
+    "DMSO:5:negcon:U2OS",
+    "DMSO:5:negcon:UMUC9",
+    "DMSO:9.99:negcon:U2OS",
+    "DMSO:9.99:negcon:UMUC9",
+    "nan:nan:negcon:UMUC9",
+    "nan:DMSO:negcon:nan",
+    "nan:DMSO:negcon:nan",
+    "nan:nan:nan",
+    "nan:nan:DMSO",
+    "nan:nan",
+    "nan:nan:DMSO:negcon"
 ]
 
 SOURCE3_BATCH_REDLIST = {

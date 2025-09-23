@@ -7,7 +7,7 @@ description = "Workflow for processing cpg0016-jump profiles"
 readme = "README.md"
 dependencies = [
     "copairs @ git+https://github.com/cytomining/copairs.git@v0.4.4",
-    "harmonypy @ git+https://github.com/shntnu/harmonypy.git@cupy-migrate"
+    "harmonypy @ git+https://github.com/shntnu/harmonypy.git@v0.0.10-shntnu.1"
     ]
 name = "jump-profiling-recipe"
 requires-python = ">= 3.11"
