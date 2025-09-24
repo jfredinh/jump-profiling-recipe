@@ -222,3 +222,40 @@ rule harmony:
         use_gpu=config.get("use_gpu", False),
     run:
         correct.apply_harmony_correction(input[0], params.batch_key, params.use_gpu, output[0])
+
+
+rule setup_harmonyrsc:
+    output:
+        directory("resources/harmonyrsc"),
+        "resources/harmonyrsc/harmonyrsc.py",
+        "resources/harmonyrsc/pixi.toml"
+    params:
+        repo_url="https://github.com/shntnu/harmonyrsc.git",
+        commit_hash="main"
+    shell:
+        """
+        git clone {params.repo_url} resources/harmonyrsc
+        cd resources/harmonyrsc
+        git checkout {params.commit_hash}
+        pixi install
+        """
+
+
+rule harmonyrsc:
+    input:
+        profiles="outputs/{scenario}/{pipeline}.parquet",
+        harmonyrsc_setup="resources/harmonyrsc/harmonyrsc.py"
+    output:
+        "outputs/{scenario}/{pipeline}_harmonyrsc.parquet",
+    benchmark:
+        "benchmarks/{scenario}/{pipeline}_harmonyrsc.txt"
+    params:
+        batch_key=config["batch_key"],
+        n_clusters=config.get("harmony_n_clusters", 300),
+        harmonyrsc_dir="resources/harmonyrsc"
+    shell:
+        """
+        cd {params.harmonyrsc_dir} && \
+        PIXI_PROJECT_MANIFEST="" pixi run -e default python harmonyrsc.py \
+        ../../{input.profiles} ../../{output} {params.batch_key} {params.n_clusters}
+        """

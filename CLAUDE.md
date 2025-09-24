@@ -39,6 +39,10 @@ snakemake -c1 outputs/compound/profiles_var_mad_int_featselect_harmony.parquet -
 
 # Verbose execution for debugging
 snakemake -c1 --configfile inputs/config/compound.json --verbose
+
+# Run with Rapids SingleCell Harmony (HarmonyRSC) - automatically downloads and uses separate pixi environment
+# The HarmonyRSC repository will be automatically downloaded to resources/harmonyrsc/ on first use
+snakemake -c4 --configfile inputs/config/example_harmonyrsc.json
 ```
 
 ### Testing
@@ -85,7 +89,7 @@ source download_data.sh compound  # or crispr, orf
 
 **Python Package** (`src/jump_profiling_recipe/`):
 - `preprocessing/`: Feature selection, normalization, transformations
-- `correct/`: Batch correction including Harmony GPU implementation (`harmony_gpu.py`)
+- `correct/`: Batch correction including Harmony GPU implementation (`harmony_gpu.py`) and Rapids SingleCell Harmony (`harmonyrsc.py`)
 - `cli/converter.py`: Tool for converting non-JUMP data to JUMP format
 
 **Rules** (`rules/`):
@@ -105,7 +109,7 @@ Each step creates intermediate files with suffixes matching the pipeline string 
 
 ### Key Technical Details
 
-- **Harmony Batch Correction**: Uses custom GPU implementation when available (`correct/harmony_gpu.py`)
+- **Harmony Batch Correction**: Uses custom GPU implementation when available (`correct/harmony_gpu.py`) or Rapids SingleCell implementation with automatic repository download. The HarmonyRSC implementation uses the `harmonyrsc` rule which automatically clones the repository to `resources/harmonyrsc/` and manages dependencies with pixi
 - **Parallel Processing**: Rules support multi-core execution via Snakemake's `-c` flag
 - **Feature Columns**: Controlled by `inputs/metadata/cpg0016_mandatory_feature_columns*.txt`
 - **Metadata Integration**: Automatic gene annotation for CRISPR data, chromosome arm correction support
@@ -117,6 +121,30 @@ Each step creates intermediate files with suffixes matching the pipeline string 
 - Feature columns: Morphological measurements from Cell Painting
 - Key identifier: `Metadata_JCP2022` for perturbation tracking
 
+## HarmonyRSC Troubleshooting
+
+The Rapids SingleCell Harmony implementation requires special setup:
+
+### Common Issues and Solutions
+
+1. **"git: command not found" error**:
+   - **Solution**: Ensure git is installed and available in PATH
+   - HarmonyRSC repository is automatically downloaded using git clone
+
+2. **"FileNotFoundError" for input files**:
+   - The harmonyrsc script runs from `resources/harmonyrsc/` directory
+   - Input/output paths are automatically converted to absolute paths in the script
+   - Ensure the input file exists in the jump-profiling-recipe outputs directory
+
+3. **Repository download issues**:
+   - Check internet connectivity
+   - Verify access to https://github.com/shntnu/harmonyrsc.git
+   - Clean resources directory if download was interrupted: `rm -rf resources/harmonyrsc`
+
+### HarmonyRSC Environment
+
+The HarmonyRSC implementation automatically downloads the repository to `resources/harmonyrsc/` and uses a separate pixi environment with Rapids SingleCell dependencies. The repository and environment are set up automatically on first use.
+
 ## Important Notes
 
 - Always check if test/lint commands exist before suggesting to run them
@@ -124,3 +152,25 @@ Each step creates intermediate files with suffixes matching the pipeline string 
 - GPU support requires Linux and CUDA-capable hardware
 - Harmony correction is computationally intensive; GPU acceleration recommended for large datasets
 - When modifying the pipeline, ensure intermediate file naming follows the suffix pattern
+- HarmonyRSC requires git to be installed for automatic repository downloading
+
+## Resource Management
+
+### Cleaning Up HarmonyRSC Resources
+
+To clean up downloaded HarmonyRSC resources (useful for updates or troubleshooting):
+```bash
+# Remove downloaded repository and environment
+rm -rf resources/harmonyrsc
+
+# Next run will automatically re-download and reinstall
+snakemake -c4 --configfile inputs/config/example_harmonyrsc.json
+```
+
+### Repository Information
+
+The HarmonyRSC implementation automatically downloads:
+- **Repository**: https://github.com/shntnu/harmonyrsc.git
+- **Location**: `resources/harmonyrsc/`
+- **Environment**: Pixi-managed Rapids SingleCell environment
+- **Version**: Pinned to main branch (configurable in Snakefile)

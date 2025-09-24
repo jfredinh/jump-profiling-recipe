@@ -31,6 +31,58 @@ Choose a configuration file (e.g., `compound.json` for processing compound data 
 snakemake -c4 --configfile inputs/config/compound.json
 ```
 
+### Quick Start with HarmonyRSC
+
+To use the Rapids SingleCell Harmony implementation instead of the standard Harmony:
+
+1. **Setup environment**:
+   ```bash
+   pixi install
+   pixi shell
+   ```
+
+2. **Use a HarmonyRSC configuration file** (these have `harmonyrsc` in the pipeline string):
+   ```bash
+   # Use the example HarmonyRSC config - repository will be automatically downloaded
+   snakemake -c4 --configfile inputs/config/example_harmonyrsc.json
+
+   # Or use the compound-specific HarmonyRSC config if available
+   snakemake -c4 --configfile inputs/config/compound_gene_combo_addon_harmonyrsc.json
+   ```
+
+3. **Automatic setup**: On first use, Snakemake will:
+   - Clone the HarmonyRSC repository to `resources/harmonyrsc/`
+   - Install the pixi environment with Rapids SingleCell dependencies
+   - Then proceed with Harmony batch correction
+
+4. **Check progress**: HarmonyRSC processing will show output like:
+   ```
+   Original shape: (152755, 770)
+   PCA complete: (152755, 300)
+   Running Harmony on key: Metadata_Batch with 300 clusters
+   Harmony complete: (152755, 300)
+   Saved harmonized data to: outputs/example-harmonyrsc/profiles_var_mad_int_featselect_harmonyrsc.parquet
+   ```
+
+### Requirements for HarmonyRSC
+
+- **Git**: Required for automatic repository downloading
+- **Internet connection**: Needed to clone repository from GitHub
+- **Pixi**: Automatically managed within the downloaded repository
+
+### Managing HarmonyRSC Resources
+
+**Clean up resources** (for updates or troubleshooting):
+```bash
+rm -rf resources/harmonyrsc
+```
+
+**Force re-download**:
+```bash
+rm -rf resources/harmonyrsc
+snakemake -c4 --configfile inputs/config/example_harmonyrsc.json
+```
+
 ## Detailed Documentation
 
 ### Data Types
@@ -155,7 +207,11 @@ Without these settings, numerical libraries might use all available CPU cores fo
 
 ##### GPU Acceleration for Harmony Batch Correction
 
-The Harmony batch correction step supports GPU acceleration for significant speedup on large datasets:
+The workflow supports two GPU-accelerated implementations of Harmony batch correction:
+
+**Option 1: Standard Harmony GPU Implementation**
+
+The default Harmony batch correction step supports GPU acceleration for significant speedup on large datasets:
 
 1. Ensure you have the GPU environment installed:
 ```bash
@@ -177,6 +233,22 @@ MKL_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 pixi run -e gpu snake
 ```
 
 The GPU acceleration will automatically fall back to CPU if CUDA is unavailable.
+
+**Option 2: Rapids SingleCell Harmony (HarmonyRSC)**
+
+An alternative implementation using Rapids SingleCell for potentially better performance:
+
+1. Use a HarmonyRSC configuration file (e.g., `example_harmonyrsc.json` or `compound_gene_combo_addon_harmonyrsc.json`)
+2. Run the workflow (repository will be automatically downloaded and set up):
+```bash
+snakemake -c4 --configfile inputs/config/example_harmonyrsc.json
+```
+3. The HarmonyRSC implementation automatically:
+   - Downloads the repository from https://github.com/shntnu/harmonyrsc.git to `resources/harmonyrsc/`
+   - Installs the pixi environment with Rapids SingleCell dependencies
+   - Manages its own isolated environment
+
+Note: HarmonyRSC configs use the `harmonyrsc` rule instead of the standard `harmony` rule, which automatically downloads and uses a separate Rapids SingleCell implementation.
 
 #### Parallel Execution
 
@@ -213,6 +285,8 @@ snakemake -c1 outputs/compound/profiles_var_mad_int_featselect_harmony.parquet -
 - `correct_arm`: Performs chromosome arm correction
 - `featselect`: Selects features to keep
 - `harmony`: Applies Harmony batch correction
+- `harmonyrsc`: Applies Rapids SingleCell Harmony batch correction (alternative to `harmony`)
+- `setup_harmonyrsc`: Automatically downloads and sets up HarmonyRSC repository (dependency of `harmonyrsc`)
 - `reformat`: Performs final formatting checks
 
 #### Metrics Rules

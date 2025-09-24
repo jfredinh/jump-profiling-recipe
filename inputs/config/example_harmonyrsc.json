@@ -1,0 +1,17 @@
+{
+    "scenario": "example-harmonyrsc",
+    "pipeline": "profiles_var_mad_int_featselect_harmonyrsc",
+    "keep_image_features": false,
+    "use_mad_negcon": true,
+    "sources": [
+        "source_1",
+        "source_2"
+    ],
+    "plate_types": [
+        "COMPOUND"
+    ],
+    "batch_key": "Metadata_Batch",
+    "harmony_n_clusters": 300,
+    "sphering_method": "ZCA-cor",
+    "sphering_n_opts": 25
+}
