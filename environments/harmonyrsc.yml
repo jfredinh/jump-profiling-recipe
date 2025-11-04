@@ -1,0 +1,14 @@
+name: harmonyrsc
+channels:
+  - conda-forge
+  - rapidsai
+  - nvidia
+dependencies:
+  - python=3.11
+  - cudf
+  - cupy
+  - rapids-singlecell
+  - anndata
+  - pandas
+  - numpy
+  - scikit-learn

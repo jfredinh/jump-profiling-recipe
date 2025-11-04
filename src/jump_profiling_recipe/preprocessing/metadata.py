@@ -450,13 +450,24 @@ def get_well_metadata(
 
     validate_columns(well_metadata, ["Metadata_JCP2022"])
 
-    if "ORF" in plate_types:
+    if ("ORF" in plate_types) and ("CRISPR" in plate_types):
+        orf_metadata = pd.read_csv("./inputs/metadata/orf.csv.gz")
+        crispr_metadata = pd.read_csv("./inputs/metadata/crispr.csv.gz")
+        combined_metadata = pd.concat([orf_metadata, crispr_metadata], ignore_index=True)
+
+        combined_metadata["Metadata_NCBI_Gene_ID"] = combined_metadata["Metadata_NCBI_Gene_ID"].astype(str)
+        combined_metadata["Metadata_Symbol"] = combined_metadata["Metadata_Symbol"].astype(str)
+
+        well_metadata = well_metadata.merge(
+            combined_metadata, how="left", on="Metadata_JCP2022"
+        )
+    elif "ORF" in plate_types:
         orf_metadata = pd.read_csv("./inputs/metadata/orf.csv.gz")
         well_metadata = well_metadata.merge(
             orf_metadata, how="left", on="Metadata_JCP2022"
         )
         # well_metadata = well_metadata[well_metadata['Metadata_pert_type']!='poscon']
-    if "CRISPR" in plate_types:
+    elif "CRISPR" in plate_types:
         crispr_metadata = pd.read_csv("./inputs/metadata/crispr.csv.gz")
         well_metadata = well_metadata.merge(
             crispr_metadata, how="left", on="Metadata_JCP2022"
@@ -473,6 +484,38 @@ def get_well_metadata(
 # ------------------------------
 # Metadata Integration
 # ------------------------------
+
+
+def validate_merge_columns(df: pd.DataFrame, operation_name: str = "merge") -> None:
+    """Validate that a DataFrame doesn't contain problematic _x/_y columns from merges.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame to validate
+    operation_name : str, optional
+        Name of the operation for error reporting
+
+    Raises
+    ------
+    ValueError
+        If _x or _y suffix columns are found
+    """
+    suffix_columns = [col for col in df.columns if col.endswith(('_x', '_y'))]
+    if suffix_columns:
+        logger.warning(f"{operation_name} produced {len(suffix_columns)} problematic columns: {suffix_columns}")
+
+        # Check for common critical columns
+        critical_patterns = ['Metadata_PlateType', 'Metadata_Batch', 'Metadata_Symbol', 'Metadata_JCP2022']
+        critical_conflicts = [col for col in suffix_columns
+                            if any(pattern in col for pattern in critical_patterns)]
+
+        if critical_conflicts:
+            raise ValueError(
+                f"{operation_name} created critical column conflicts: {critical_conflicts}. "
+                f"These conflicts will break downstream analysis. "
+                f"Consider using explicit suffixes in the merge operation."
+            )
 
 
 def load_metadata(
@@ -505,4 +548,8 @@ def load_metadata(
     )
     well = get_well_metadata(plate_types, search_additional_metadata, sources)
     meta = well.merge(plate, on=["Metadata_Source", "Metadata_Plate"])
+
+    # Validate the merge didn't create problematic columns
+    validate_merge_columns(meta, "plate-well merge")
+
     return meta
