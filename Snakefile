@@ -228,7 +228,7 @@ rule setup_harmonyrsc:
     output:
         directory("resources/harmonyrsc"),
         "resources/harmonyrsc/harmonyrsc.py",
-        "resources/harmonyrsc/pixi.toml"
+        "resources/harmonyrsc/pyproject.toml"
     params:
         repo_url="https://github.com/shntnu/harmonyrsc.git",
         commit_hash="main"
