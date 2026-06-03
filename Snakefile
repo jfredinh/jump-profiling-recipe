@@ -14,10 +14,13 @@ include: "rules/map.smk"
 rule all:
     input:
         f"outputs/{config['scenario']}/reformat.done",
+        # Include harmonyrsc sweep and summary if config specifies the parameter lists
+        f"outputs/{config['scenario']}/harmonyrsc_sweep.done" if config.get("harmonyrsc_n_clusters_list") else [],
+        f"outputs/{config['scenario']}/metrics/harmonyrsc_sweep_summary.csv" if config.get("harmonyrsc_n_clusters_list") else [],
         # ap_negcon_path=f"outputs/{config['scenario']}/metrics/{config['pipeline']}_ap_negcon.parquet",
         # map_negcon_path=f"outputs/{config['scenario']}/metrics/{config['pipeline']}_map_negcon.parquet",
-        ap_nonrep_path=f"outputs/{config['scenario']}/metrics/{config['pipeline']}_ap_nonrep.parquet",
-        map_nonrep_path=f"outputs/{config['scenario']}/metrics/{config['pipeline']}_map_nonrep.parquet",
+        # ap_nonrep_path=f"outputs/{config['scenario']}/metrics/{config['pipeline']}_ap_nonrep.parquet",
+        # map_nonrep_path=f"outputs/{config['scenario']}/metrics/{config['pipeline']}_map_nonrep.parquet",
 
 rule reformat:
     input:
@@ -246,16 +249,177 @@ rule harmonyrsc:
         profiles="outputs/{scenario}/{pipeline}.parquet",
         harmonyrsc_setup="resources/harmonyrsc/harmonyrsc.py"
     output:
-        "outputs/{scenario}/{pipeline}_harmonyrsc.parquet",
+        "outputs/{scenario}/{pipeline}_harmonyrsc_nc{n_clusters}_pca{n_pca}.parquet",
     benchmark:
-        "benchmarks/{scenario}/{pipeline}_harmonyrsc.txt"
+        "benchmarks/{scenario}/{pipeline}_harmonyrsc_nc{n_clusters}_pca{n_pca}.txt"
+    wildcard_constraints:
+        n_clusters=r"\d+",
+        n_pca=r"\d+"
     params:
         batch_key=config["batch_key"],
-        n_clusters=config.get("harmony_n_clusters", 300),
         harmonyrsc_dir="resources/harmonyrsc"
     shell:
         """
         cd {params.harmonyrsc_dir} && \
         PIXI_PROJECT_MANIFEST="" pixi run -e default python harmonyrsc.py \
-        ../../{input.profiles} ../../{output} {params.batch_key} {params.n_clusters}
+        ../../{input.profiles} ../../{output} {params.batch_key} {wildcards.n_clusters} {wildcards.n_pca}
+        """
+
+
+# Rule to run all harmonyrsc parameter combinations with MAP calculations
+rule harmonyrsc_sweep:
+    input:
+        profiles=expand(
+            "outputs/{scenario}/{pipeline}_harmonyrsc_nc{n_clusters}_pca{n_pca}.parquet",
+            scenario=config["scenario"],
+            pipeline=config.get("harmonyrsc_input_pipeline", "profiles_var_mad_int_featselect"),
+            n_clusters=config.get("harmonyrsc_n_clusters_list", [100, 200, 300]),
+            n_pca=config.get("harmonyrsc_n_pca_list", [50, 100, 200, 300])
+        ),
+        maps=expand(
+            "outputs/{scenario}/metrics/{pipeline}_harmonyrsc_nc{n_clusters}_pca{n_pca}_map_negcon.parquet",
+            scenario=config["scenario"],
+            pipeline=config.get("harmonyrsc_input_pipeline", "profiles_var_mad_int_featselect"),
+            n_clusters=config.get("harmonyrsc_n_clusters_list", [100, 200, 300]),
+            n_pca=config.get("harmonyrsc_n_pca_list", [50, 100, 200, 300])
+        )
+    output:
+        touch("outputs/{scenario}/harmonyrsc_sweep.done")
+
+
+# Rule to create summary heatmap of MAP scores across parameter combinations
+rule harmonyrsc_sweep_summary:
+    input:
+        maps=expand(
+            "outputs/{scenario}/metrics/{pipeline}_harmonyrsc_nc{n_clusters}_pca{n_pca}_map_negcon.parquet",
+            scenario=config["scenario"],
+            pipeline=config.get("harmonyrsc_input_pipeline", "profiles_var_mad_int_featselect"),
+            n_clusters=config.get("harmonyrsc_n_clusters_list", [100, 200, 300]),
+            n_pca=config.get("harmonyrsc_n_pca_list", [50, 100, 200, 300])
+        ),
+        sweep_done="outputs/{scenario}/harmonyrsc_sweep.done"
+    output:
+        heatmap_map="outputs/{scenario}/metrics/harmonyrsc_sweep_heatmap_map.png",
+        heatmap_pct="outputs/{scenario}/metrics/harmonyrsc_sweep_heatmap_pct_significant.png",
+        heatmap_pct_fdr10="outputs/{scenario}/metrics/harmonyrsc_sweep_heatmap_pct_significant_fdr10.png",
+        summary_csv="outputs/{scenario}/metrics/harmonyrsc_sweep_summary.csv"
+    params:
+        metrics_dir=lambda w: f"outputs/{w.scenario}/metrics",
+        threshold=config.get("map_params", {}).get("threshold", 0.05),
+        harmonyrsc_dir="resources/harmonyrsc"
+    shell:
+        """
+        cd {params.harmonyrsc_dir} && \
+        PIXI_PROJECT_MANIFEST="" pixi run -e default python -c "
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import re
+import glob
+import os
+
+# Use absolute path
+base_dir = os.path.dirname(os.path.dirname(os.getcwd()))
+metrics_dir = os.path.join(base_dir, '{params.metrics_dir}')
+threshold = {params.threshold}
+
+print(f'Looking for files in: {{metrics_dir}}')
+
+# Find all MAP files
+map_files = glob.glob(os.path.join(metrics_dir, '*_harmonyrsc_nc*_pca*_map_negcon.parquet'))
+print(f'Found {{len(map_files)}} MAP files')
+
+results = []
+for map_file in map_files:
+    match = re.search(r'_nc([0-9]+)_pca([0-9]+)_map_negcon[.]parquet', map_file)
+    if match:
+        n_clusters = int(match.group(1))
+        n_pca = int(match.group(2))
+
+        map_df = pd.read_parquet(map_file)
+        mean_norm_map = map_df['mean_average_precision'].mean()
+        n_significant = (map_df['corrected_p_value'] < threshold).sum()
+        n_significant_fdr10 = (map_df['corrected_p_value'] < 0.1).sum()
+        n_total = len(map_df)
+        pct_significant = (n_significant / n_total) * 100 if n_total > 0 else 0
+        pct_significant_fdr10 = (n_significant_fdr10 / n_total) * 100 if n_total > 0 else 0
+
+        results.append({{
+            'n_clusters': n_clusters,
+            'n_pca': n_pca,
+            'mean_normalized_map': mean_norm_map,
+            'n_significant': n_significant,
+            'n_significant_fdr10': n_significant_fdr10,
+            'n_total': n_total,
+            'pct_significant': pct_significant,
+            'pct_significant_fdr10': pct_significant_fdr10,
+            'p_value_threshold': threshold
+        }})
+
+print(f'Processed {{len(results)}} results')
+
+summary_df = pd.DataFrame(results)
+summary_df = summary_df.sort_values(['n_pca', 'n_clusters'])
+output_csv = os.path.join(base_dir, '{output.summary_csv}')
+summary_df.to_csv(output_csv, index=False)
+print(f'Saved summary to: {{output_csv}}')
+
+# Heatmap for normalized MAP
+heatmap_map_data = summary_df.pivot(index='n_clusters', columns='n_pca', values='mean_normalized_map')
+heatmap_map_data = heatmap_map_data.sort_index(ascending=True)
+heatmap_map_data = heatmap_map_data.reindex(sorted(heatmap_map_data.columns), axis=1)
+
+plt.figure(figsize=(12, 10))
+vmin = heatmap_map_data.values.min()
+vmax = heatmap_map_data.values.max()
+sns.heatmap(heatmap_map_data, annot=True, fmt='.4f', cmap='viridis',
+            vmin=vmin, vmax=vmax, cbar_kws={{'label': 'Mean Normalized MAP'}})
+plt.title('HarmonyRSC Parameter Sweep: Mean Normalized MAP')
+plt.xlabel('Number of PCA Components')
+plt.ylabel('Number of Clusters')
+plt.tight_layout()
+output_heatmap_map = os.path.join(base_dir, '{output.heatmap_map}')
+plt.savefig(output_heatmap_map, dpi=150)
+plt.close()
+print(f'Saved MAP heatmap to: {{output_heatmap_map}}')
+
+# Heatmap for % significant
+heatmap_pct_data = summary_df.pivot(index='n_clusters', columns='n_pca', values='pct_significant')
+heatmap_pct_data = heatmap_pct_data.sort_index(ascending=True)
+heatmap_pct_data = heatmap_pct_data.reindex(sorted(heatmap_pct_data.columns), axis=1)
+
+plt.figure(figsize=(12, 10))
+vmin = heatmap_pct_data.values.min()
+vmax = heatmap_pct_data.values.max()
+sns.heatmap(heatmap_pct_data, annot=True, fmt='.1f', cmap='viridis',
+            vmin=vmin, vmax=vmax, cbar_kws={{'label': f'% Significant (p < {{threshold}})'}})
+plt.title(f'HarmonyRSC Parameter Sweep: % Compounds with Corrected p-value < {{threshold}}')
+plt.xlabel('Number of PCA Components')
+plt.ylabel('Number of Clusters')
+plt.tight_layout()
+output_heatmap_pct = os.path.join(base_dir, '{output.heatmap_pct}')
+plt.savefig(output_heatmap_pct, dpi=150)
+plt.close()
+print(f'Saved pct significant heatmap to: {{output_heatmap_pct}}')
+
+# Heatmap for % significant with FDR 0.1
+heatmap_pct_fdr10_data = summary_df.pivot(index='n_clusters', columns='n_pca', values='pct_significant_fdr10')
+heatmap_pct_fdr10_data = heatmap_pct_fdr10_data.sort_index(ascending=True)
+heatmap_pct_fdr10_data = heatmap_pct_fdr10_data.reindex(sorted(heatmap_pct_fdr10_data.columns), axis=1)
+
+plt.figure(figsize=(12, 10))
+vmin = heatmap_pct_fdr10_data.values.min()
+vmax = heatmap_pct_fdr10_data.values.max()
+sns.heatmap(heatmap_pct_fdr10_data, annot=True, fmt='.1f', cmap='viridis',
+            vmin=vmin, vmax=vmax, cbar_kws={{'label': '% Significant (FDR < 0.1)'}})
+plt.title('HarmonyRSC Parameter Sweep: % Compounds with Corrected p-value < 0.1')
+plt.xlabel('Number of PCA Components')
+plt.ylabel('Number of Clusters')
+plt.tight_layout()
+output_heatmap_pct_fdr10 = os.path.join(base_dir, '{output.heatmap_pct_fdr10}')
+plt.savefig(output_heatmap_pct_fdr10, dpi=150)
+plt.close()
+print(f'Saved FDR 0.1 heatmap to: {{output_heatmap_pct_fdr10}}')
+"
         """

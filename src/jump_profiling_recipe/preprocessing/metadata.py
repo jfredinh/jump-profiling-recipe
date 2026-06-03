@@ -453,6 +453,11 @@ def get_well_metadata(
     if ("ORF" in plate_types) and ("CRISPR" in plate_types):
         orf_metadata = pd.read_csv("./inputs/metadata/orf.csv.gz")
         crispr_metadata = pd.read_csv("./inputs/metadata/crispr.csv.gz")
+
+        # Set Metadata_Perturbation_Type to distinguish ORF vs CRISPR
+        orf_metadata["Metadata_Perturbation_Type"] = "orf"
+        crispr_metadata["Metadata_Perturbation_Type"] = "crispr"
+
         combined_metadata = pd.concat([orf_metadata, crispr_metadata], ignore_index=True)
 
         combined_metadata["Metadata_NCBI_Gene_ID"] = combined_metadata["Metadata_NCBI_Gene_ID"].astype(str)
@@ -463,12 +468,16 @@ def get_well_metadata(
         )
     elif "ORF" in plate_types:
         orf_metadata = pd.read_csv("./inputs/metadata/orf.csv.gz")
+        # Set Metadata_Perturbation_Type for ORF data
+        orf_metadata["Metadata_Perturbation_Type"] = "orf"
         well_metadata = well_metadata.merge(
             orf_metadata, how="left", on="Metadata_JCP2022"
         )
         # well_metadata = well_metadata[well_metadata['Metadata_pert_type']!='poscon']
     elif "CRISPR" in plate_types:
         crispr_metadata = pd.read_csv("./inputs/metadata/crispr.csv.gz")
+        # Set Metadata_Perturbation_Type for CRISPR data
+        crispr_metadata["Metadata_Perturbation_Type"] = "crispr"
         well_metadata = well_metadata.merge(
             crispr_metadata, how="left", on="Metadata_JCP2022"
         )

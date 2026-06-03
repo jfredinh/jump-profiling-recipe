@@ -34,3 +34,5 @@ requirements/.current-requirement
 !.pixi/config.toml
 inputs/config/compound_DL_CPCNN_no_source7.json
 inputs/config/compound_no_source7.json
+# HarmonyRSC tool checkout — cloned at runtime, has its own pixi env/data
+resources/

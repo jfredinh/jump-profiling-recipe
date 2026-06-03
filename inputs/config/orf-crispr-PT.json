@@ -1,0 +1,17 @@
+{
+    "scenario": "orf-crispr-PT",
+    "pipeline": "profiles_var_mad_int_featselect_harmonyrsc_nc300_pca300",
+    "keep_image_features": false,
+    "use_mad_negcon": true,
+    "sources": ["source_4", 
+                "source_13"],
+    "plate_types": 
+                ["ORF", 
+                "TARGET2", 
+                "CRISPR"],
+    "batch_key": "Metadata_Batch",
+    "harmonyrsc_n_clusters_list": [300],
+    "harmonyrsc_n_pca_list": [300],
+    "sphering_method": "ZCA-cor",
+    "sphering_n_opts": 25
+}
